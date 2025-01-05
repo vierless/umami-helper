@@ -4,22 +4,55 @@
 
 	// Configuration
 	const config = {
-		debug: true,
+		debug: false,
 		retryAttempts: 3,
 		retryDelay: 1000,
-		defaultFormEvent: 'form_submit',
-		defaultTypeformEvent: 'typeform_submit',
-		defaultCalendlyEvent: 'calendly_submit',
-		defaultHubspotEvent: 'hubspot_submit',
+		tracking: {
+			forms: {
+				enabled: true,
+				eventName: 'form_submit',
+			},
+			typeform: {
+				enabled: true,
+				eventName: 'typeform_submit',
+			},
+			calendly: {
+				enabled: true,
+				eventName: 'calendly_submit',
+			},
+			hubspot: {
+				enabled: true,
+				eventName: 'hubspot_submit',
+			},
+			scroll: {
+				enabled: false,
+				thresholds: [25, 50, 75],
+				eventName: 'scroll_depth',
+			},
+		},
 	};
 
 	// Main analytics wrapper
 	class UmamiHelper {
 		constructor(options = {}) {
-			this.config = { ...config, ...options };
+			this.config = this.mergeConfig(config, options);
 			this.initialized = false;
 			this.eventQueue = [];
+			this.logDebug('Initialized with config:', JSON.stringify(this.config.tracking, null, 2));
 			this.init();
+		}
+
+		// Deep merge helper
+		mergeConfig(default_config, user_config) {
+			const merged = { ...default_config };
+			for (const key in user_config) {
+				if (typeof user_config[key] === 'object' && !Array.isArray(user_config[key])) {
+					merged[key] = this.mergeConfig(default_config[key] || {}, user_config[key]);
+				} else {
+					merged[key] = user_config[key];
+				}
+			}
+			return merged;
 		}
 
 		// Initialize the helper
@@ -67,11 +100,33 @@
 
 		// Set up event listeners
 		setupEventListeners() {
-			this.setupFormTracking();
-			this.setupTypeformTracking();
-			this.setupCalendlyTracking();
-			this.setupHubspotTracking();
-			// Additional third-party integrations can be added here
+			const { tracking } = this.config;
+
+			// Setup trackers
+			if (tracking.forms.enabled) {
+				this.logDebug('Initializing forms tracking');
+				this.setupFormTracking();
+			}
+
+			if (tracking.typeform.enabled) {
+				this.logDebug('Initializing typeform tracking');
+				this.setupTypeformTracking();
+			}
+
+			if (tracking.calendly.enabled) {
+				this.logDebug('Initializing calendly tracking');
+				this.setupCalendlyTracking();
+			}
+
+			if (tracking.hubspot.enabled) {
+				this.logDebug('Initializing hubspot tracking');
+				this.setupHubspotTracking();
+			}
+
+			if (tracking.scroll.enabled) {
+				this.logDebug('Initializing scroll tracking');
+				this.setupScrollTracking();
+			}
 		}
 
 		// Form tracking setup
@@ -80,7 +135,7 @@
 
 			forms.forEach((form) => {
 				const formWrapper = form.closest('[data-umami-event]');
-				const eventName = this.getUmamiEvent(formWrapper, this.config.defaultFormEvent);
+				const eventName = this.getUmamiEvent(formWrapper, this.config.tracking.forms.eventName);
 
 				form.addEventListener('submit', (e) => {
 					this.logEvent(eventName, {
@@ -93,15 +148,15 @@
 
 		// Typeform tracking setup
 		setupTypeformTracking() {
-			function isTypeformEvent(e) {
+			const isTypeformEvent = (e) => {
 				return e.origin === 'https://form.typeform.com' && e.data;
-			}
+			};
 			window.addEventListener('message', (e) => {
 				if (isTypeformEvent(e)) {
 					if (e.data.type === 'form-submit') {
 						const typeform = document.querySelector(`[data-tf-widget="${e.data.formId}"]`);
 						const typeformEmbed = typeform.closest('[data-tf-live]');
-						const eventName = this.getUmamiEvent(typeformEmbed, this.config.defaultTypeformEvent);
+						const eventName = this.getUmamiEvent(typeformEmbed, this.config.tracking.typeform.eventName);
 						const formName = typeform.querySelector('iframe')?.title;
 
 						this.logEvent(eventName, {
@@ -116,20 +171,20 @@
 
 		// Calendly tracking setup
 		setupCalendlyTracking() {
-			function isCalendlyEvent(e) {
+			const isCalendlyEvent = (e) => {
 				return e.origin === 'https://calendly.com' && e.data.event && e.data.event.indexOf('calendly.') === 0;
-			}
-			function extractIdFromUrl(url, pattern) {
+			};
+			const extractIdFromUrl = (url, pattern) => {
 				const match = url.match(pattern);
 				return match ? match[1] : null;
-			}
+			};
 			window.addEventListener('message', (e) => {
 				if (isCalendlyEvent(e)) {
 					if (e.data.event === 'calendly.event_scheduled') {
 						const eventId = extractIdFromUrl(e.data.payload.event.uri, /scheduled_events\/([^/]+)/);
 						const inviteeId = extractIdFromUrl(e.data.payload.invitee.uri, /invitees\/([^/]+)/);
 						const calendlyEmbed = document.querySelector('[data-url*="https://calendly.com/"]');
-						const eventName = this.getUmamiEvent(calendlyEmbed, this.config.defaultCalendlyEvent);
+						const eventName = this.getUmamiEvent(calendlyEmbed, this.config.tracking.calendly.eventName);
 
 						this.logEvent(eventName, {
 							form_url: calendlyEmbed.dataset.url,
@@ -143,14 +198,14 @@
 
 		// HubSpot tracking setup
 		setupHubspotTracking() {
-			function isHubspotEvent(e) {
+			const isHubspotEvent = (e) => {
 				return e.origin.includes('.hubspot.com') && e.data;
-			}
+			};
 			window.addEventListener('message', (e) => {
 				if (isHubspotEvent(e)) {
 					if (e.data.meetingBookSucceeded) {
 						const hubspotEmbed = document.querySelector('.meetings-iframe-container');
-						const eventName = this.getUmamiEvent(hubspotEmbed, this.config.defaultHubspotEvent);
+						const eventName = this.getUmamiEvent(hubspotEmbed, this.config.tracking.hubspot.eventName);
 						const organizerName = e.data.meetingsPayload.bookingResponse.postResponse.organizer.name;
 						const meetingDate = e.data.meetingsPayload.bookingResponse.event.dateString;
 						const meetingStartTime = e.data.meetingsPayload.bookingResponse.postResponse.timerange.start;
@@ -167,6 +222,51 @@
 					}
 				}
 			});
+		}
+
+		// Scroll tracking setup
+		setupScrollTracking() {
+			const { thresholds, eventName } = this.config.tracking.scroll;
+			const reached = new Set();
+
+			const getScrollPercentage = () => {
+				const windowHeight = document.documentElement.clientHeight;
+				const documentHeight = document.documentElement.scrollHeight - windowHeight;
+				const scrolled = window.scrollY;
+				return (scrolled / documentHeight) * 100;
+			};
+
+			const handleScroll = () => {
+				const percentage = Math.round(getScrollPercentage());
+				thresholds.forEach((threshold) => {
+					if (percentage >= threshold && !reached.has(threshold)) {
+						reached.add(threshold);
+						this.logEvent(eventName, {
+							percentage: threshold,
+							url: window.location.pathname,
+						});
+					}
+				});
+			};
+
+			let scrollEventAttached = false;
+
+			const attachScrollHandler = () => {
+				if (!scrollEventAttached) {
+					scrollEventAttached = true;
+					window.addEventListener('scroll', handleScroll, { passive: true });
+					handleScroll();
+				}
+			};
+
+			setTimeout(() => {
+				const initialPercentage = getScrollPercentage();
+				if (initialPercentage < 25) {
+					attachScrollHandler();
+				}
+			}, 1000);
+
+			window.addEventListener('scroll', attachScrollHandler, { once: true, passive: true });
 		}
 
 		// Custom event override
@@ -220,5 +320,24 @@
 	}
 
 	// Create global instance
-	window.UmamiHelper = new UmamiHelper();
+	window.UmamiHelper = {
+		instance: null,
+		initialized: false,
+		init: (config) => {
+			if (!window.UmamiHelper.initialized) {
+				window.UmamiHelper.initialized = true;
+				window.UmamiHelper.instance = new UmamiHelper(config);
+				return window.UmamiHelper.instance;
+			}
+			return window.UmamiHelper.instance;
+		},
+	};
+
+	// Wait for custom config
+	setTimeout(() => {
+		if (!window.UmamiHelper.initialized) {
+			window.UmamiHelper.initialized = true;
+			window.UmamiHelper.instance = new UmamiHelper();
+		}
+	}, 0);
 })(window);

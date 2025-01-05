@@ -140,6 +140,35 @@ tracking: {
 }
 ```
 
+### Outbound Links
+
+Tracks clicks on outbound links.
+
+```javascript
+tracking: {
+  outbound: {
+    enabled: true,
+    eventName: 'outbound_link'
+  }
+}
+```
+
+### Contact Links
+
+Tracks clicks on phone (tel:) and mail (mailto:) links.
+
+```javascript
+tracking: {
+  contactLinks: {
+    enabled: true,
+    eventName: {
+      phone: 'phone_link',
+      email: 'email_link',
+    },
+  },
+}
+```
+
 ---
 
 ## Event Properties
@@ -179,6 +208,17 @@ Each tracker sends specific properties with its events:
 - **`meeting_start`**: ISO timestamp of meeting `start date`
 - **`meeting_end`**: ISO timestamp of meeting `end date`
 - **`meeting_duration`**: Meeting `duration` in milliseconds
+- **`timestamp`**: ISO timestamp
+
+### Outbound Link Events
+
+- **`url`**: The `url` of the clicked link
+- **`timestamp`**: ISO timestamp
+
+### Contact Link Events
+
+- **`number`**: The `number` of the clicked tel: link
+- **`email`**: The `email` of the clicked mailto: link
 - **`timestamp`**: ISO timestamp
 
 ---

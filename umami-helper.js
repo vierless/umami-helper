@@ -29,6 +29,17 @@
 				thresholds: [25, 50, 75],
 				eventName: 'scroll_depth',
 			},
+			outbound: {
+				enabled: true,
+				eventName: 'outbound_link',
+			},
+			contactLinks: {
+				enabled: true,
+				eventName: {
+					phone: 'phone_link',
+					email: 'email_link',
+				},
+			},
 		},
 	};
 
@@ -126,6 +137,16 @@
 			if (tracking.scroll.enabled) {
 				this.logDebug('Initializing scroll tracking');
 				this.setupScrollTracking();
+			}
+
+			if (tracking.outbound.enabled) {
+				this.logDebug('Initializing outbound link tracking');
+				this.setupOutboundLinkTracking();
+			}
+
+			if (tracking.contactLinks.enabled) {
+				this.logDebug('Initializing contact link tracking');
+				this.setupContactLinkTracking();
 			}
 		}
 
@@ -267,6 +288,40 @@
 			}, 1000);
 
 			window.addEventListener('scroll', attachScrollHandler, { once: true, passive: true });
+		}
+
+		// Outbound links
+		setupOutboundLinkTracking() {
+			document.querySelectorAll('a').forEach((a) => {
+				if (a.href.startsWith('tel:') || a.href.startsWith('mailto:')) {
+					return;
+				}
+
+				const eventName = this.getUmamiEvent(a, this.config.tracking.outbound.eventName);
+				if (a.host !== window.location.host) {
+					a.setAttribute('data-umami-event', eventName);
+					a.setAttribute('data-umami-event-url', a.href);
+				}
+			});
+		}
+
+		// Contact links
+		setupContactLinkTracking() {
+			document.querySelectorAll('a').forEach((a) => {
+				if (a.href.startsWith('tel:')) {
+					const phoneNumber = a.href.replace('tel:', '');
+					const eventName = this.getUmamiEvent(a, this.config.tracking.contactLinks.eventName.phone);
+					a.setAttribute('data-umami-event', eventName);
+					a.setAttribute('data-umami-event-number', phoneNumber);
+				}
+
+				if (a.href.startsWith('mailto:')) {
+					const emailAddress = a.href.replace('mailto:', '');
+					const eventName = this.getUmamiEvent(a, this.config.tracking.contactLinks.eventName.email);
+					a.setAttribute('data-umami-event', eventName);
+					a.setAttribute('data-umami-event-email', emailAddress);
+				}
+			});
 		}
 
 		// Custom event override

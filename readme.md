@@ -36,7 +36,7 @@ A lightweight helper library for [Umami Analytics](https://umami.is) that provid
 <!-- umami-helper script -->
 <script
 	defer
-	src="https://cdn.jsdelivr.net/gh/vierless/umami-helper@v1.0.0/helper.js"></script>
+	src="https://cdn.jsdelivr.net/gh/vierless/umami-helper@latest/umami-helper.js"></script>
 ```
 
 2. That's it! All tracking features (except scroll) are enabled by default.
